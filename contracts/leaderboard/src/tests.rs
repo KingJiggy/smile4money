@@ -122,7 +122,7 @@ fn earnings_are_recorded_in_the_match_token() {
     );
     // A caller rendering earnings must be able to say which currency the
     // number is in.
-    assert_eq!(f.client.get_stats(&f.player1).token, usdc);
+    assert_eq!(f.client.get_stats(&f.player1).token, Some(usdc.clone()));
 }
 
 #[test]
@@ -446,7 +446,7 @@ fn leaderboard_entry_carries_stats_and_token() {
     let entry = board.get(0);
     assert_eq!(entry.stats.wins, 1);
     assert_eq!(entry.stats.earnings, 10);
-    assert_eq!(entry.stats.token, f.token);
+    assert_eq!(entry.stats.token, Some(f.token.clone()));
 }
 
 #[test]
@@ -473,4 +473,32 @@ fn loss_only_players_are_still_ranked() {
         }
     }
     assert!(found, "the losing player should be on the leaderboard");
+}
+#[test]
+fn unseen_player_has_no_token() {
+    let f = setup();
+    let stranger = Address::generate(&f.env);
+    let stats = f.client.get_stats(&stranger);
+    assert_eq!(stats.token, None);
+    assert_eq!(stats.earnings, 0);
+    assert_eq!(stats.matches_played(), 0);
+}
+
+#[test]
+fn only_a_player_with_earnings_has_a_token() {
+    let f = setup();
+
+    let winner = Address::generate(&f.env);
+    let loser = Address::generate(&f.env);
+    record(&f, MatchOutcome::Player1Won, 100, &winner, &loser);
+    assert_eq!(f.client.get_stats(&winner).token, Some(f.token.clone()));
+    // A loss credits no earnings, so no denomination is claimed.
+    assert_eq!(f.client.get_stats(&loser).token, None);
+
+    let a = Address::generate(&f.env);
+    let b = Address::generate(&f.env);
+    record(&f, MatchOutcome::Draw, 0, &a, &b);
+    // A draw credits nobody.
+    assert_eq!(f.client.get_stats(&a).token, None);
+    assert_eq!(f.client.get_stats(&b).token, None);
 }
